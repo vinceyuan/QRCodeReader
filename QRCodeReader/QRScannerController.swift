@@ -9,6 +9,8 @@
 import UIKit
 import AVFoundation
 
+let MAX_QRCODE_COUNT = 5
+
 class QRScannerController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
 
     @IBOutlet var messageLabel:UILabel!
@@ -16,7 +18,7 @@ class QRScannerController: UIViewController, AVCaptureMetadataOutputObjectsDeleg
     
     var captureSession:AVCaptureSession?
     var videoPreviewLayer:AVCaptureVideoPreviewLayer?
-    var qrCodeFrameView:UIView?
+    var qrCodeFrameViews: [UIView] = []
     
     let supportedCodeTypes = [AVMetadataObject.ObjectType.upce,
                         AVMetadataObject.ObjectType.code39,
@@ -66,16 +68,16 @@ class QRScannerController: UIViewController, AVCaptureMetadataOutputObjectsDeleg
             view.bringSubview(toFront: messageLabel)
             view.bringSubview(toFront: topbar)
             
-            // Initialize QR Code Frame to highlight the QR code
-            qrCodeFrameView = UIView()
-            
-            if let qrCodeFrameView = qrCodeFrameView {
+            // Initialize QR Code Frames to highlight the QR code
+            for _ in 1...MAX_QRCODE_COUNT {
+                let qrCodeFrameView = UIView()
                 qrCodeFrameView.layer.borderColor = UIColor.green.cgColor
                 qrCodeFrameView.layer.borderWidth = 2
                 view.addSubview(qrCodeFrameView)
                 view.bringSubview(toFront: qrCodeFrameView)
+                qrCodeFrameViews.append(qrCodeFrameView)
             }
-            
+
         } catch {
             // If any error occurs, simply print it out and don't continue any more.
             print(error)
@@ -94,24 +96,31 @@ class QRScannerController: UIViewController, AVCaptureMetadataOutputObjectsDeleg
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         
         // Check if the metadataObjects array is not nil and it contains at least one object.
-        if metadataObjects == nil || metadataObjects.count == 0 {
-            qrCodeFrameView?.frame = CGRect.zero
+        if metadataObjects.count == 0 {
+
             messageLabel.text = "No QR/barcode is detected"
-            return
         }
-        
-        // Get the metadata object.
-        let metadataObj = metadataObjects[0] as! AVMetadataMachineReadableCodeObject
-        
-        if supportedCodeTypes.contains(metadataObj.type) {
-            // If the found metadata is equal to the QR code metadata then update the status label's text and set the bounds
-            let barCodeObject = videoPreviewLayer?.transformedMetadataObject(for: metadataObj)
-            qrCodeFrameView?.frame = barCodeObject!.bounds
-            
-            if metadataObj.stringValue != nil {
-                messageLabel.text = metadataObj.stringValue
+
+        for i in metadataObjects.count ..< MAX_QRCODE_COUNT {
+            qrCodeFrameViews[i].frame = CGRect.zero
+        }
+
+        for i in 0..<metadataObjects.count {
+            if i < MAX_QRCODE_COUNT {
+                // Get the metadata object.
+                let metadataObj = metadataObjects[i] as! AVMetadataMachineReadableCodeObject
+                if supportedCodeTypes.contains(metadataObj.type) {
+                    // If the found metadata is equal to the QR code metadata then update the status label's text and set the bounds
+                    let barCodeObject = videoPreviewLayer?.transformedMetadataObject(for: metadataObj)
+                    qrCodeFrameViews[i].frame = barCodeObject!.bounds
+
+                    if metadataObj.stringValue != nil && i == 0 {
+                        messageLabel.text = metadataObj.stringValue
+                    }
+                }
             }
         }
+        
     }
 
 }
